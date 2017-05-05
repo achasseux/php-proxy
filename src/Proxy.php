@@ -137,13 +137,14 @@ class Proxy {
 			$options[CURLOPT_HTTPHEADER] = explode("\r\n", $this->request->getRawHeaders());
 			$options[CURLOPT_CUSTOMREQUEST] = $this->request->getMethod();
 			$options[CURLOPT_POSTFIELDS] =  $this->request->getRawBody();
-			
+
 			$ch = curl_init();
 			curl_setopt_array($ch, $options);
 			
 			// fetch the status - if exception if throw any at callbacks, then the error will be supressed
 			$result = @curl_exec($ch);
-			
+			curl_close($ch);
+
 			// there must have been an error if at this point
 			if(!$result){
 					
