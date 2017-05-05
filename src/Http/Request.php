@@ -116,19 +116,19 @@ class Request {
 	
 	// https://github.com/guzzle/psr7/blob/master/src/functions.php
 	public static function parseQuery($query){
-		
+
 		$result = array();
-		
+
 		foreach(explode('&', $query) as $kvp){
 			$parts = explode('=', $kvp);
 			$key = rawurldecode($parts[0]);
 			if(substr($key, -2) == '[]'){
 				$key = substr($key, 0, -2);
             }
-			
+
 			// keys with NULL will be ignored in http_build_query - that's why it has to be ''
 			$value = isset($parts[1]) ? rawurldecode($parts[1]) : '';
-			
+
 			// brand new key=value
 			if(!isset($result[$key])){
 				$result[$key] = $value;
@@ -137,14 +137,14 @@ class Request {
 				if(!is_array($result[$key])){
 					$result[$key] = array($result[$key]);
 				}
-				
+
 				$result[$key][] = $value;
 			}
 		}
-		
+
 		return $result;
 	}
-	
+
 	public function setUrl($url){
 		// remove hashtag - preg_replace so we don't have to check for its existence first - is it possible preserving hashtag?
 		$url = preg_replace('/#.*/', '', $url);
@@ -260,15 +260,27 @@ class Request {
 		
 		// data better have [name, tmp_name, and optional type]
 		foreach($files as $name => $values){
-			
-			// There must be no error http://php.net/manual/en/features.file-upload.errors.php
-			if(!$values['tmp_name'] || $values['error'] !== 0 || !is_readable($values['tmp_name'])){
-				continue;
+			// Multiple files can be uploaded using different name for input.
+			// See http://php.net/manual/en/features.file-upload.multiple.php
+			if (!is_array($values['tmp_name'])) {
+				    $multiValues = array_map(function($a){return (array)$a;}, $values);
+					$fieldName   = $name;
+			} else {
+					$multiValues = $values;
+					$fieldName   = "{$name}[]";
 			}
-			
-			$body .= sprintf($part_file, $boundary, $name, $values['name'], $values['type']);
-			$body .= file_get_contents($values['tmp_name']);
-			$body .= "\r\n";
+
+			foreach (array_keys($multiValues['tmp_name']) as $key) {
+
+				// There must be no error http://php.net/manual/en/features.file-upload.errors.php
+				if(!$multiValues['tmp_name'][$key] || $multiValues['error'][$key] !== 0 || !is_readable($multiValues['tmp_name'][$key])){
+					continue;
+				}
+				
+				$body .= sprintf($part_file, $boundary, $fieldName, $multiValues['name'][$key], $multiValues['type'][$key]);
+				$body .= file_get_contents($multiValues['tmp_name'][$key]);
+				$body .= "\r\n";				
+			}
 		}
 		
 		$body .= "--{$boundary}--\r\n\r\n";
